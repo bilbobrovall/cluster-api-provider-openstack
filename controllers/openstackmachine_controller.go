@@ -33,6 +33,7 @@ import (
 	"k8s.io/utils/pointer"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
+	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -285,6 +286,71 @@ func (r *OpenStackMachineReconciler) reconcileDelete(scope scope.Scope, cluster 
 	return ctrl.Result{}, nil
 }
 
+// reconcileFloatingIPClaims ensures that OpenStackMachines that are configured with .spec.floatingAddressesFromPools
+// have corresponding IPAddressClaims for each floating IP pool.
+func (r *OpenStackMachineReconciler) reconcileFloatingIPClaims(ctx context.Context, machine *infrav1.OpenStackMachine, scope scope.Scope) error {
+	totalClaims, claimsCreated, claimsFulfilled := 0, 0, 0
+
+	var (
+		claims  []conditions.Getter
+		errList []error
+	)
+	if len(machine.Spec.FloatingAddressesFromPools) == 0 {
+		return nil
+	}
+
+	// for each pool, check if there is a corresponding IPAddressClaim
+	for poolIndex, pool := range machine.Spec.FloatingAddressesFromPools {
+		totalClaims++
+		ipAddrClaimName := fmt.Sprintf("%s-%d", machine.Name, poolIndex)
+		ipAddrClaim := &ipamv1.IPAddressClaim{}
+		ipAdrClaimKey := client.ObjectKey{Namespace: machine.Namespace, Name: ipAddrClaimName}
+		if err := r.Client.Get(ctx, ipAdrClaimKey, ipAddrClaim); err != nil {
+			if apierrors.IsNotFound(err) {
+
+				// create the IPAddressClaim
+				ipAddrClaim = &ipamv1.IPAddressClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      ipAddrClaimName,
+						Namespace: machine.Namespace,
+						Labels: map[string]string{
+							clusterv1.ClusterLabelName: machine.Labels[clusterv1.ClusterLabelName],
+						},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								APIVersion: machine.APIVersion,
+								Kind:       machine.Kind,
+								Name:       machine.Name,
+								UID:        machine.UID,
+							},
+						},
+					},
+					Spec: ipamv1.IPAddressClaimSpec{
+						AddressType: ipamv1.IPAddressClaimTypeFloating,
+						Pool:        pool,
+					},
+				}
+				if err := r.Client.Create(ctx, ipAddrClaim); err != nil {
+					errList = append(errList, err)
+					continue
+				}
+				claimsCreated++
+				continue
+
+			} else {
+				errList = append(errList, err)
+				continue
+			}
+		} else {
+			// check if the IPAddressClaim is fulfilled
+			if conditions.IsTrue(ipAddrClaim, ipamv1.IPAddressClaimFulfilledCondition) {
+				claimsFulfilled++
+				continue
+			}
+		}
+	}
+}
+
 func (r *OpenStackMachineReconciler) reconcileNormal(ctx context.Context, scope scope.Scope, cluster *clusterv1.Cluster, openStackCluster *infrav1.OpenStackCluster, machine *clusterv1.Machine, openStackMachine *infrav1.OpenStackMachine) (_ ctrl.Result, reterr error) {
 	// If the OpenStackMachine is in an error state, return early.
 	if openStackMachine.Status.FailureReason != nil || openStackMachine.Status.FailureMessage != nil {
@@ -385,6 +451,10 @@ func (r *OpenStackMachineReconciler) reconcileNormal(ctx context.Context, scope 
 		scope.Logger().Info("Waiting for instance to become ACTIVE", "id", instanceStatus.ID(), "status", instanceStatus.State())
 		conditions.MarkUnknown(openStackMachine, infrav1.InstanceReadyCondition, infrav1.InstanceNotReadyReason, "Instance state is not handled: %s", instanceStatus.State())
 		return ctrl.Result{RequeueAfter: waitForInstanceBecomeActiveToReconcile}, nil
+	}
+
+	if err := r.reconcileIPAddressClaims(ctx, machine, client); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if !util.IsControlPlaneMachine(machine) {

@@ -92,6 +92,9 @@ type OpenStackMachineSpec struct {
 	// IdentityRef is a reference to a identity to be used when reconciling this cluster
 	// +optional
 	IdentityRef *OpenStackIdentityReference `json:"identityRef,omitempty"`
+
+	// FloatingAddressesFromPools are IPPools from which floating IP addresses are allocated to any type of node.
+	FloatingAddressesFromPools []corev1.TypedLocalObjectReference `json:"floatingAddressesFromPools,omitempty"`
 }
 
 // OpenStackMachineStatus defines the observed state of OpenStackMachine.
