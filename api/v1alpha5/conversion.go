@@ -444,6 +444,14 @@ func Convert_v1alpha5_OpenStackClusterStatus_To_v1alpha7_OpenStackClusterStatus(
 	return nil
 }
 
+func Convert_v1alpha5_OpenStackMachineStatus_To_v1alpha7_OpenStackMachineStatus(in *OpenStackMachineStatus, out *infrav1.OpenStackMachineStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha5_OpenStackMachineStatus_To_v1alpha7_OpenStackMachineStatus(in, out, s)
+}
+
+func Convert_v1alpha7_OpenStackMachineStatus_To_v1alpha5_OpenStackMachineStatus(in *infrav1.OpenStackMachineStatus, out *OpenStackMachineStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha7_OpenStackMachineStatus_To_v1alpha5_OpenStackMachineStatus(in, out, s)
+}
+
 func Convert_v1alpha7_OpenStackMachineSpec_To_v1alpha5_OpenStackMachineSpec(in *infrav1.OpenStackMachineSpec, out *OpenStackMachineSpec, s conversion.Scope) error {
 	return autoConvert_v1alpha7_OpenStackMachineSpec_To_v1alpha5_OpenStackMachineSpec(in, out, s)
 }

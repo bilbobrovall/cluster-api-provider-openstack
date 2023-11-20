@@ -96,7 +96,7 @@ var _ = AfterSuite(func() {
 })
 
 var _ = Describe("EnvTest sanity check", func() {
-	ctx = context.TODO()
+	ctx := context.TODO()
 	It("should be able to create a namespace", func() {
 		testNamespace := "capo-test"
 		namespacedName := types.NamespacedName{

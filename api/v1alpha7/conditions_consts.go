@@ -47,9 +47,17 @@ const (
 const (
 	// APIServerIngressReadyCondition reports on the current status of the network ingress (Loadbalancer, Floating IP) for Control Plane machines. Ready indicates that the instance can receive requests.
 	APIServerIngressReadyCondition clusterv1.ConditionType = "APIServerIngressReadyCondition"
-
 	// LoadBalancerMemberErrorReason used when the instance could not be added as a loadbalancer member.
 	LoadBalancerMemberErrorReason = "LoadBalancerMemberError"
 	// FloatingIPErrorReason used when the floating ip could not be created or attached.
 	FloatingIPErrorReason = "FloatingIPError"
+)
+
+const (
+	// FloatingAddressFromPoolReadyCondition reports on the current status of the Floating IPs from ipam pool.
+	FloatingAddressFromPoolReadyCondition clusterv1.ConditionType = "FloatingAddressFromPoolReady"
+	// WaitingForIpamProviderReason used when machine is waiting for ipam provider to be ready before proceeding.
+	FloatingAddressFromPoolWaitingForIpamProviderReason = "WaitingForIpamProvider"
+	// FloatingAddressFromPoolErrorReason is used when FloatingAddressFromPool is used when there is and error attaching an IP from the pool.
+	FloatingAddressFromPoolErrorReason = "FloatingIPError"
 )

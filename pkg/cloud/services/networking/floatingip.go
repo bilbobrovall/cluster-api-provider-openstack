@@ -81,6 +81,18 @@ func (s *Service) GetFloatingIP(ip string) (*floatingips.FloatingIP, error) {
 	return &fpList[0], nil
 }
 
+func (s *Service) GetAllFloatingIPs() ([]string, error) {
+	fips, err := s.client.ListFloatingIP(nil)
+	if err != nil {
+		return nil, err
+	}
+	floatingIPs := make([]string, 0, len(fips))
+	for _, fip := range fips {
+		floatingIPs = append(floatingIPs, fip.FloatingIP)
+	}
+	return floatingIPs, nil
+}
+
 func (s *Service) GetFloatingIPByPortID(portID string) (*floatingips.FloatingIP, error) {
 	fpList, err := s.client.ListFloatingIP(floatingips.ListOpts{PortID: portID})
 	if err != nil {
