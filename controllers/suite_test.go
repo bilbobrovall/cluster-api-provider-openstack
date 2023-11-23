@@ -82,6 +82,9 @@ var _ = BeforeSuite(func() {
 
 	framework.TryAddDefaultSchemes(scheme.Scheme)
 
+	err = infrastructurev1alpha7.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	// +kubebuilder:scaffold:scheme
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})

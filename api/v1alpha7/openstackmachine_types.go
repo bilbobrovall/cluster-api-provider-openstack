@@ -27,7 +27,8 @@ import (
 const (
 	// MachineFinalizer allows ReconcileOpenStackMachine to clean up OpenStack resources associated with OpenStackMachine before
 	// removing it from the apiserver.
-	MachineFinalizer = "openstackmachine.infrastructure.cluster.x-k8s.io"
+	MachineFinalizer         = "openstackmachine.infrastructure.cluster.x-k8s.io"
+	FloatingIPClaimFinalizer = "floatingipclaim.openstackmachine.infrastructure.cluster.x-k8s.io"
 )
 
 // OpenStackMachineSpec defines the desired state of OpenStackMachine.

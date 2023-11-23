@@ -22,6 +22,8 @@ const (
 	// InstanceReadyCondition reports on current status of the OpenStack instance. Ready indicates the instance is in a Running state.
 	InstanceReadyCondition clusterv1.ConditionType = "InstanceReady"
 
+	// FloatingIPReadyReason is used when the floating IP is ready.
+	FloatingIPsReadyReason = "FloatingIPsReady"
 	// WaitingForClusterInfrastructureReason used when machine is waiting for cluster infrastructure to be ready before proceeding.
 	WaitingForClusterInfrastructureReason = "WaitingForClusterInfrastructure"
 	// WaitingForBootstrapDataReason used when machine is waiting for bootstrap data to be ready before proceeding.

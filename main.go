@@ -34,6 +34,7 @@ import (
 	_ "k8s.io/component-base/logs/json/register"
 	"k8s.io/klog/v2"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -78,6 +79,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = clusterv1.AddToScheme(scheme)
+	_ = ipamv1.AddToScheme(scheme)
 	_ = infrav1.AddToScheme(scheme)
 	_ = infrav1alpha5.AddToScheme(scheme)
 	_ = infrav1alpha6.AddToScheme(scheme)
@@ -257,6 +259,16 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager, caCerts []byte, sco
 		CaCertificates:   caCerts,
 	}).SetupWithManager(ctx, mgr, concurrency(openStackMachineConcurrency)); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OpenStackMachine")
+		os.Exit(1)
+	}
+	if err := (&controllers.OpenStackFloatingIPPoolReconciler{
+		Client:         mgr.GetClient(),
+		Recorder:       mgr.GetEventRecorderFor("floatingippool-controller"),
+		ScopeFactory:   scopeFactory,
+		Scheme:         mgr.GetScheme(),
+		CaCertificates: caCerts,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "FloatingIPPool")
 		os.Exit(1)
 	}
 }
