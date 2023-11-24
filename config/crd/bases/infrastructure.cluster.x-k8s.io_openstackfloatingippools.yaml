@@ -1,0 +1,69 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: openstackfloatingippools.infrastructure.cluster.x-k8s.io
+spec:
+  group: infrastructure.cluster.x-k8s.io
+  names:
+    kind: OpenStackFloatingIPPool
+    listKind: OpenStackFloatingIPPoolList
+    plural: openstackfloatingippools
+    singular: openstackfloatingippool
+  scope: Namespaced
+  versions:
+  - name: v1alpha7
+    schema:
+      openAPIV3Schema:
+        description: OpenStackFloatingIPPool is the Schema for the openstackfloatingippools
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: OpenStackFloatingIPPoolSpec defines the desired state of
+              OpenStackFloatingIPPool
+            properties:
+              maxSize:
+                type: integer
+              preAllocatedFloatingIPs:
+                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                  Important: Run "make" to regenerate code after modifying this file'
+                items:
+                  type: string
+                type: array
+            type: object
+          status:
+            description: OpenStackFloatingIPPoolStatus defines the observed state
+              of OpenStackFloatingIPPool
+            properties:
+              availableIPs:
+                items:
+                  type: string
+                type: array
+              claimedIPs:
+                items:
+                  type: string
+                type: array
+              ips:
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

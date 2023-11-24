@@ -44,26 +44,6 @@ rules:
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
-  - OpenstackFloatingIPPools
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - infrastructure.cluster.x-k8s.io
-  resources:
-  - OpenstackFloatingIPPools/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - infrastructure.cluster.x-k8s.io
-  resources:
   - openstackclusters
   verbs:
   - create
@@ -77,6 +57,26 @@ rules:
   - infrastructure.cluster.x-k8s.io
   resources:
   - openstackclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - openstackfloatingippools
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - infrastructure.cluster.x-k8s.io
+  resources:
+  - openstackfloatingippools/status
   verbs:
   - get
   - patch
@@ -123,6 +123,5 @@ rules:
   - delete
   - get
   - list
-  - patch
   - update
   - watch

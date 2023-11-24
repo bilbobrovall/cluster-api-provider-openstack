@@ -326,6 +326,9 @@ func (r *OpenStackMachineReconciler) reconcileFloatingIPClaims(ctx context.Conte
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      claimName,
 						Namespace: openStackMachine.Namespace,
+						Labels: map[string]string{
+							clusterv1.ClusterNameLabel: openStackCluster.Labels[clusterv1.ClusterNameLabel],
+						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
 								APIVersion: openStackMachine.APIVersion,
