@@ -219,7 +219,6 @@ func main() {
 	setupChecks(mgr)
 	setupReconcilers(ctx, mgr, caCerts, scopeFactory)
 	setupWebhooks(mgr)
-
 	// +kubebuilder:scaffold:builder
 	setupLog.Info("starting manager", "version", version.Get().String())
 	if err := mgr.Start(ctx); err != nil {
@@ -271,6 +270,16 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager, caCerts []byte, sco
 		setupLog.Error(err, "unable to create controller", "controller", "FloatingIPPool")
 		os.Exit(1)
 	}
+	if err := (&controllers.IPAddressReconciler{
+		Client:         mgr.GetClient(),
+		Recorder:       mgr.GetEventRecorderFor("ipaddress-controller"),
+		ScopeFactory:   scopeFactory,
+		Scheme:         mgr.GetScheme(),
+		CaCertificates: caCerts,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "IPAddress")
+		os.Exit(1)
+	}
 }
 
 func setupWebhooks(mgr ctrl.Manager) {
@@ -300,6 +309,11 @@ func setupWebhooks(mgr ctrl.Manager) {
 	}
 	if err := (&infrav1.OpenStackClusterList{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "OpenStackClusterList")
+		os.Exit(1)
+	}
+
+	if err := (&infrav1.OpenStackFloatingIPPool{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "OpenStackFloatingIPPool")
 		os.Exit(1)
 	}
 }

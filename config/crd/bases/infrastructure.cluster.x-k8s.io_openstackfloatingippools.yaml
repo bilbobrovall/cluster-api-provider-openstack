@@ -36,11 +36,28 @@ spec:
             description: OpenStackFloatingIPPoolSpec defines the desired state of
               OpenStackFloatingIPPool
             properties:
-              maxSize:
-                type: integer
+              cloudName:
+                description: The name of the cloud to use from the clouds secret
+                type: string
+              identityRef:
+                description: IdentityRef is a reference to a identity to be used when
+                  reconciling this pool.
+                properties:
+                  kind:
+                    description: Kind of the identity. Must be supported by the infrastructure
+                      provider and may be either cluster or namespace-scoped.
+                    minLength: 1
+                    type: string
+                  name:
+                    description: Name of the infrastructure identity to be used. Must
+                      be either a cluster-scoped resource, or namespaced-scoped resource
+                      the same namespace as the resource(s) being provisioned.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
               preAllocatedFloatingIPs:
-                description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-                  Important: Run "make" to regenerate code after modifying this file'
                 items:
                   type: string
                 type: array

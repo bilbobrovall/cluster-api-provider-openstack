@@ -98,6 +98,29 @@ func (f *providerScopeFactory) NewClientScopeFromCluster(ctx context.Context, ct
 	return NewCachedProviderScope(f.clientCache, cloud, caCert, logger)
 }
 
+func (f *providerScopeFactory) NewClientScopeFromFloatingIPPool(ctx context.Context, ctrlClient client.Client, openstackFloatingIPPool *infrav1.OpenStackFloatingIPPool, defaultCACert []byte, logger logr.Logger) (Scope, error) {
+	var cloud clientconfig.Cloud
+	var caCert []byte
+
+	if openstackFloatingIPPool.Spec.IdentityRef != nil {
+		var err error
+		cloud, caCert, err = getCloudFromSecret(ctx, ctrlClient, openstackFloatingIPPool.Namespace, openstackFloatingIPPool.Spec.IdentityRef.Name, openstackFloatingIPPool.Spec.CloudName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if caCert == nil {
+		caCert = defaultCACert
+	}
+
+	if f.clientCache == nil {
+		return NewProviderScope(cloud, caCert, logger)
+	}
+
+	return NewCachedProviderScope(f.clientCache, cloud, caCert, logger)
+}
+
 func getScopeCacheKey(cloud clientconfig.Cloud) (string, error) {
 	key, err := hash.ComputeSpewHash(cloud)
 	if err != nil {

@@ -43,6 +43,7 @@ func NewFactory(maxCacheSize int) Factory {
 type Factory interface {
 	NewClientScopeFromMachine(ctx context.Context, ctrlClient client.Client, openStackMachine *infrav1.OpenStackMachine, defaultCACert []byte, logger logr.Logger) (Scope, error)
 	NewClientScopeFromCluster(ctx context.Context, ctrlClient client.Client, openStackCluster *infrav1.OpenStackCluster, defaultCACert []byte, logger logr.Logger) (Scope, error)
+	NewClientScopeFromFloatingIPPool(ctx context.Context, ctrlClient client.Client, openStackCluster *infrav1.OpenStackFloatingIPPool, defaultCACert []byte, logger logr.Logger) (Scope, error)
 }
 
 // Scope contains arguments common to most operations.

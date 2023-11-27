@@ -22,8 +22,6 @@ const (
 	// InstanceReadyCondition reports on current status of the OpenStack instance. Ready indicates the instance is in a Running state.
 	InstanceReadyCondition clusterv1.ConditionType = "InstanceReady"
 
-	// FloatingIPReadyReason is used when the floating IP is ready.
-	FloatingIPsReadyReason = "FloatingIPsReady"
 	// WaitingForClusterInfrastructureReason used when machine is waiting for cluster infrastructure to be ready before proceeding.
 	WaitingForClusterInfrastructureReason = "WaitingForClusterInfrastructure"
 	// WaitingForBootstrapDataReason used when machine is waiting for bootstrap data to be ready before proceeding.
@@ -54,4 +52,16 @@ const (
 	LoadBalancerMemberErrorReason = "LoadBalancerMemberError"
 	// FloatingIPErrorReason used when the floating ip could not be created or attached.
 	FloatingIPErrorReason = "FloatingIPError"
+)
+
+const (
+	// FloatingIPsFromPoolReadyCondition reports on the current status of the Floating IPs from ipam pool.
+	FloatingIPsFromPoolReadyCondition clusterv1.ConditionType = "FloatingIPsFromPoolReady"
+
+	// FloatingIPPoolNotSpecifiedReason used when the floating ip pool is not specified.
+	FloatingIPsFromPoolNotSpecifiedReason = "FloatingIPsFromPoolNotSpecified"
+	// WaitingForIpamProviderReason used when machine is waiting for ipam provider to be ready before proceeding.
+	FloatingIPsFromPoolWaitingForIpamProviderReason = "WaitingForIpamProvider"
+	// FloatingIPsFromPoolErrorReason is used when FloatingIPsFromPool is used when there is and error attaching an IP from the pool.
+	FloatingIPsFromPoolErrorReason = "FloatingIPError"
 )

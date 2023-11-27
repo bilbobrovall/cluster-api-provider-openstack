@@ -125,3 +125,23 @@ rules:
   - list
   - update
   - watch
+- apiGroups:
+  - ipam.cluster.x-k8x.io.cluster.x-k8s.io
+  resources:
+  - ipaddresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ipam.cluster.x-k8x.io.cluster.x-k8s.io
+  resources:
+  - ipaddresses/status
+  verbs:
+  - get
+  - patch
+  - update

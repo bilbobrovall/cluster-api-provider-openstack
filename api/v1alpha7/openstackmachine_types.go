@@ -27,8 +27,8 @@ import (
 const (
 	// MachineFinalizer allows ReconcileOpenStackMachine to clean up OpenStack resources associated with OpenStackMachine before
 	// removing it from the apiserver.
-	MachineFinalizer         = "openstackmachine.infrastructure.cluster.x-k8s.io"
-	FloatingIPClaimFinalizer = "floatingipclaim.openstackmachine.infrastructure.cluster.x-k8s.io"
+	MachineFinalizer        = "openstackmachine.infrastructure.cluster.x-k8s.io"
+	IPClaimMachineFinalizer = "openstackmachine.infrastructure.cluster.x-k8s.io/ip-claim"
 )
 
 // OpenStackMachineSpec defines the desired state of OpenStackMachine.
@@ -94,7 +94,10 @@ type OpenStackMachineSpec struct {
 	// +optional
 	IdentityRef *OpenStackIdentityReference `json:"identityRef,omitempty"`
 
-	// FloatingAddressesFromPools are IPPools from which floating IP addresses are allocated to any type of node.
+	// FloatingAddressesFromPools is a list of IPAddressPools that should be assigned
+	// to IPAddressClaims. The IPAddresses fulfilled by the IPAddressClaims will be
+	// associated with the OpenStackMachine instance.
+	// +optional
 	FloatingAddressesFromPools []corev1.TypedLocalObjectReference `json:"floatingAddressesFromPools,omitempty"`
 }
 

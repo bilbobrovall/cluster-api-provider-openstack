@@ -1694,9 +1694,9 @@ spec:
                                   your server instance.
                                 type: string
                               floatingAddressesFromPools:
-                                description: FloatingAddressesFromPools are IPPools
+                                description: 'FloatingAddressesFromPools are IPPools
                                   from which floating IP addresses are allocated to
-                                  any type of node.
+                                  any type of node. TODO: Addresses > IPs ?'
                                 items:
                                   description: TypedLocalObjectReference contains
                                     enough information to let you locate the typed
