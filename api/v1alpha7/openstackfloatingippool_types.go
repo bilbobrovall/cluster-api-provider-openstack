@@ -29,21 +29,21 @@ const (
 
 	OpenStackFloatingIPPoolNameIndex = "spec.poolRef.name"
 
-	// OpenStackFloatingIPPoolIP
+	// OpenStackFloatingIPPoolIP.
 	DeleteFloatingIPFinalizer = "openstackfloatingippool.infrastructure.cluster.x-k8s.io/delete-floating-ip"
 )
 
-// ReclaimPolicy is a string type alias to represent reclaim policies for floating ips
+// ReclaimPolicy is a string type alias to represent reclaim policies for floating ips.
 type ReclaimPolicy string
 
 const (
-	// ReclaimDelete is the reclaim policy for floating ips
+	// ReclaimDelete is the reclaim policy for floating ips.
 	ReclaimDelete ReclaimPolicy = "Delete"
-	// ReclaimRetain is the reclaim policy for floating ips
+	// ReclaimRetain is the reclaim policy for floating ips.
 	ReclaimRetain ReclaimPolicy = "Retain"
 )
 
-// OpenStackFloatingIPPoolSpec defines the desired state of OpenStackFloatingIPPool
+// OpenStackFloatingIPPoolSpec defines the desired state of OpenStackFloatingIPPool.
 type OpenStackFloatingIPPoolSpec struct {
 	PreAllocatedFloatingIPs []string `json:"preAllocatedFloatingIPs,omitempty"`
 
@@ -62,7 +62,7 @@ type OpenStackFloatingIPPoolSpec struct {
 	ReclaimPolicy ReclaimPolicy `json:"reclaimPolicy,omitempty"`
 }
 
-// OpenStackFloatingIPPoolStatus defines the observed state of OpenStackFloatingIPPool
+// OpenStackFloatingIPPoolStatus defines the observed state of OpenStackFloatingIPPool.
 type OpenStackFloatingIPPoolStatus struct {
 	// +kubebuilder:default={}
 	// +optional
@@ -78,7 +78,7 @@ type OpenStackFloatingIPPoolStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// OpenStackFloatingIPPool is the Schema for the openstackfloatingippools API
+// OpenStackFloatingIPPool is the Schema for the openstackfloatingippools API.
 type OpenStackFloatingIPPool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -89,7 +89,7 @@ type OpenStackFloatingIPPool struct {
 
 //+kubebuilder:object:root=true
 
-// OpenStackFloatingIPPoolList contains a list of OpenStackFloatingIPPool
+// OpenStackFloatingIPPoolList contains a list of OpenStackFloatingIPPool.
 type OpenStackFloatingIPPoolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

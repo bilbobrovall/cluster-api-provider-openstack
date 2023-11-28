@@ -199,8 +199,6 @@ func (ns *InstanceNetworkStatus) Addresses() []corev1.NodeAddress {
 	}
 	sort.Strings(networks)
 
-	fmt.Printf("networks kuken: %v\n", networks)
-
 	var addresses []corev1.NodeAddress
 	for _, network := range networks {
 		addressList := ns.addresses[network]

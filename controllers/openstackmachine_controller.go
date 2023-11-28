@@ -295,11 +295,6 @@ func (r *OpenStackMachineReconciler) reconcileDelete(scope scope.Scope, cluster 
 // reconcileFloatingIPClaims ensures that OpenStackMachines that are configured with .spec.floatingAddressesFromPools
 // have corresponding IPAddressClaims for each floating IP pool.
 func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx context.Context, scope scope.Scope, openStackMachine *infrav1.OpenStackMachine, openStackCluster *infrav1.OpenStackCluster, instanceStatus *compute.InstanceStatus, instanceNS *compute.InstanceNetworkStatus) error {
-	var (
-		errList     []error
-		claimsReady = true
-	)
-
 	if openStackMachine.Spec.FloatingAddressFromPool == nil {
 		conditions.MarkTrue(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition)
 		return nil
@@ -349,8 +344,10 @@ func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx contex
 			if err := r.Client.Create(ctx, claim); err != nil {
 				return err
 			}
+			scope.Logger().Info("Created IPAddressClaim", "name", claim.Name)
+		} else {
+			return err
 		}
-		errList = append(errList, err)
 	}
 	// TODO: Watch the IPAddressClaim and enqueue reconcile requests for the OpenStackMachine if the IPAddressClaim changes.
 	// Requeue for now
@@ -367,13 +364,10 @@ func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx contex
 		instanceAddresses := instanceNS.Addresses()
 		for _, instanceAddress := range instanceAddresses {
 			if instanceAddress.Address == address.Spec.Address {
-				scope.Logger().Info("Address is already associated with machine") // TODO remove log
-				// Great we win something something
 				break
 			}
 		}
 
-		//TODO: associate the address with the instance
 		fip, err := networkingService.GetFloatingIP(address.Spec.Address)
 		if err != nil {
 			// set condition
@@ -398,26 +392,18 @@ func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx contex
 
 		scope.Logger().Info("Successfully associated floating IP to port yolo", "name", openStackMachine.Name) // TODO Remove log
 
-		//TODO: Make double sure the finalizer is added
 		if controllerutil.AddFinalizer(claim, infrav1.IPClaimMachineFinalizer) {
 			if err := r.Client.Update(ctx, claim); err != nil {
 				return err
 			}
 		}
 	} else {
-		// set something something requeue
+		// set condition
 		scope.Logger().Info("yolo")
 	}
 
-	if len(errList) > 0 {
-		conditions.MarkFalse(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition, infrav1.FloatingIPsFromPoolErrorReason, clusterv1.ConditionSeverityWarning, kerrors.NewAggregate(errList).Error())
-	} else if !claimsReady {
-		conditions.MarkFalse(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition, infrav1.FloatingIPsFromPoolWaitingForIpamProviderReason, clusterv1.ConditionSeverityInfo, "")
-	} else {
-		conditions.MarkTrue(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition)
-	}
-	scope.Logger().Info("Reconciled floating IP claims successfully")
-	return kerrors.NewAggregate(errList)
+	conditions.MarkTrue(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition)
+	return nil
 }
 
 func (r *OpenStackMachineReconciler) reconcileDeleteFloatingAddressFromPool(scope scope.Scope, openStackMachine *infrav1.OpenStackMachine) error {
@@ -437,10 +423,7 @@ func (r *OpenStackMachineReconciler) reconcileDeleteFloatingAddressFromPool(scop
 	}
 
 	controllerutil.RemoveFinalizer(claim, infrav1.IPClaimMachineFinalizer)
-	if err := r.Client.Update(context.Background(), claim); err != nil {
-		return err
-	}
-	return nil
+	return r.Client.Update(context.Background(), claim)
 }
 
 func (r *OpenStackMachineReconciler) reconcileNormal(ctx context.Context, scope scope.Scope, cluster *clusterv1.Cluster, openStackCluster *infrav1.OpenStackCluster, machine *clusterv1.Machine, openStackMachine *infrav1.OpenStackMachine) (_ ctrl.Result, reterr error) {

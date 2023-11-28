@@ -37,7 +37,7 @@ import (
 	ipamutils "sigs.k8s.io/cluster-api-provider-openstack/pkg/utils/ipam"
 )
 
-// IPAddressReconciler reconciles a IPAddress object
+// IPAddressReconciler reconciles a IPAddress object.
 type IPAddressReconciler struct {
 	Client           client.Client
 	Recorder         record.EventRecorder
@@ -105,10 +105,8 @@ func (r *IPAddressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			}
 			// remove ip from pool status
 			return ctrl.Result{}, nil
-		} else {
-			// TODO: less verbose logging
-			log.Info("IPAddress is being deleted but has other finalizers, waiting for them to be removed")
 		}
+		scope.Logger().Info("IPAddress is being deleted but has other finalizers, waiting for them to be removed")
 	}
 	return ctrl.Result{}, nil
 }

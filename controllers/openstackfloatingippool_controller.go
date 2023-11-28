@@ -26,8 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/cluster-api-provider-openstack/pkg/cloud/services/networking"
-	"sigs.k8s.io/cluster-api-provider-openstack/pkg/scope"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	ipamv1 "sigs.k8s.io/cluster-api/exp/ipam/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/util"
@@ -40,13 +38,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	infrav1 "sigs.k8s.io/cluster-api-provider-openstack/api/v1alpha7"
+	"sigs.k8s.io/cluster-api-provider-openstack/pkg/cloud/services/networking"
+	"sigs.k8s.io/cluster-api-provider-openstack/pkg/scope"
 )
 
 const (
 	openStackFloatingIPPool = "OpenStackFloatingIPPool"
 )
 
-// OpenStackFloatingIPPoolReconciler reconciles a OpenStackFloatingIPPool object
+// OpenStackFloatingIPPoolReconciler reconciles a OpenStackFloatingIPPool object.
 type OpenStackFloatingIPPoolReconciler struct {
 	Client           client.Client
 	Recorder         record.EventRecorder
@@ -111,7 +111,7 @@ func (r *OpenStackFloatingIPPoolReconciler) Reconcile(ctx context.Context, req c
 	}
 
 	for _, claim := range claims.Items {
-
+		claim := claim
 		cluster, err := util.GetClusterFromMetadata(ctx, r.Client, claim.ObjectMeta)
 		if err != nil {
 			log.Info("IPAddressClaim is missing cluster label or cluster does not exist")
@@ -202,10 +202,6 @@ func (r *OpenStackFloatingIPPoolReconciler) reconcileDelete(ctx context.Context,
 	return ctrl.Result{}, nil
 }
 
-func (r *OpenStackFloatingIPPoolReconciler) reconcileClaim(ctx context.Context, claim *ipamv1.IPAddressClaim) error {
-	return nil
-}
-
 func (r *OpenStackFloatingIPPoolReconciler) setIPStatuses(ctx context.Context, scope scope.Scope, pool *infrav1.OpenStackFloatingIPPool) error {
 	ipAddresses := &ipamv1.IPAddressList{}
 	if err := r.Client.List(ctx, ipAddresses, client.InNamespace(pool.Namespace), client.MatchingFields{infrav1.OpenStackFloatingIPPoolNameIndex: pool.Name}); err != nil {
@@ -256,7 +252,6 @@ func (r *OpenStackFloatingIPPoolReconciler) setIPStatuses(ctx context.Context, s
 }
 
 func (r *OpenStackFloatingIPPoolReconciler) getIP(ctx context.Context, scope scope.Scope, pool *infrav1.OpenStackFloatingIPPool, openStackCluster *infrav1.OpenStackCluster, clusterName string) (string, error) {
-
 	if len(pool.Status.AvailableIPs) > 0 {
 		ip := pool.Status.AvailableIPs[0]
 		pool.Status.AvailableIPs = pool.Status.AvailableIPs[1:]
@@ -275,7 +270,6 @@ func (r *OpenStackFloatingIPPoolReconciler) getIP(ctx context.Context, scope sco
 
 	fp, err := networkingService.GetOrCreateFloatingIP(pool, openStackCluster, clusterName, "")
 	if err != nil {
-		//conditions.MarkFalse(openStackMachine, infrav1.APIServerIngressReadyCondition, infrav1.FloatingIPErrorReason, clusterv1.ConditionSeverityError, "Floating IP cannot be obtained or created: %v", err)
 		return "", fmt.Errorf("get or create floating IP: %w", err)
 	}
 	ip := fp.FloatingIP
@@ -302,7 +296,7 @@ func (r *OpenStackFloatingIPPoolReconciler) getInfraCluster(ctx context.Context,
 	return openStackCluster, nil
 }
 
-func (r *OpenStackFloatingIPPoolReconciler) iPAddressClaimToPoolMapper(ctx context.Context, o client.Object) []ctrl.Request {
+func (r *OpenStackFloatingIPPoolReconciler) iPAddressClaimToPoolMapper(_ context.Context, o client.Object) []ctrl.Request {
 	claim, ok := o.(*ipamv1.IPAddressClaim)
 	if !ok {
 		panic(fmt.Sprintf("Expected a IPAddressClaim but got a %T", o))
@@ -320,7 +314,7 @@ func (r *OpenStackFloatingIPPoolReconciler) iPAddressClaimToPoolMapper(ctx conte
 	}
 }
 
-func (r *OpenStackFloatingIPPoolReconciler) ipAddressToPoolMapper(ctx context.Context, o client.Object) []ctrl.Request {
+func (r *OpenStackFloatingIPPoolReconciler) ipAddressToPoolMapper(_ context.Context, o client.Object) []ctrl.Request {
 	ip, ok := o.(*ipamv1.IPAddress)
 	if !ok {
 		panic(fmt.Sprintf("Expected a IPAddress but got a %T", o))

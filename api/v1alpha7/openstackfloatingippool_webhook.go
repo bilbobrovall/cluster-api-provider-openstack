@@ -41,14 +41,14 @@ var (
 	_ webhook.Validator = &OpenStackFloatingIPPool{}
 )
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type
+// Default implements webhook.Defaulter so a webhook will be registered for the type.
 func (r *OpenStackFloatingIPPool) Default() {
 	openstackfloatingippoollog.Info("default", "name", r.Name)
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
+// ValidateCreate implements webhook.Validator so a webhook will be registered for the type.
 func (r *OpenStackFloatingIPPool) ValidateCreate() (admission.Warnings, error) {
 	openstackfloatingippoollog.Info("validate create", "name", r.Name)
 
@@ -56,15 +56,15 @@ func (r *OpenStackFloatingIPPool) ValidateCreate() (admission.Warnings, error) {
 	return nil, nil
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *OpenStackFloatingIPPool) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type.
+func (r *OpenStackFloatingIPPool) ValidateUpdate(_ runtime.Object) (admission.Warnings, error) {
 	openstackfloatingippoollog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
+// ValidateDelete implements webhook.Validator so a webhook will be registered for the type.
 func (r *OpenStackFloatingIPPool) ValidateDelete() (admission.Warnings, error) {
 	openstackfloatingippoollog.Info("validate delete", "name", r.Name)
 
