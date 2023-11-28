@@ -266,7 +266,7 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager, caCerts []byte, sco
 		ScopeFactory:   scopeFactory,
 		Scheme:         mgr.GetScheme(),
 		CaCertificates: caCerts,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "FloatingIPPool")
 		os.Exit(1)
 	}
@@ -280,6 +280,17 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager, caCerts []byte, sco
 		setupLog.Error(err, "unable to create controller", "controller", "IPAddress")
 		os.Exit(1)
 	}
+
+	//	if err := (&controllers.IPAddressClaimReconciler{
+	//		Client:         mgr.GetClient(),
+	//		Recorder:       mgr.GetEventRecorderFor("ipaddressclaim-controller"),
+	//		ScopeFactory:   scopeFactory,
+	//		Scheme:         mgr.GetScheme(),
+	//		CaCertificates: caCerts,
+	//	}).SetupWithManager(ctx, mgr); err != nil {
+	//		setupLog.Error(err, "unable to create controller", "controller", "IPAddressClaim")
+	//		os.Exit(1)
+	//	}
 }
 
 func setupWebhooks(mgr ctrl.Manager) {

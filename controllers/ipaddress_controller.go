@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,8 +29,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	infrav1 "sigs.k8s.io/cluster-api-provider-openstack/api/v1alpha7"
+	"sigs.k8s.io/cluster-api-provider-openstack/pkg/cloud/services/networking"
 	"sigs.k8s.io/cluster-api-provider-openstack/pkg/scope"
 	ipamutils "sigs.k8s.io/cluster-api-provider-openstack/pkg/utils/ipam"
 )
@@ -58,22 +61,58 @@ type IPAddressReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.6.4/pkg/reconcile
 func (r *IPAddressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
+	log := ctrl.LoggerFrom(ctx).WithValues("ipaddress", req.NamespacedName)
 
-	// Get IPAddress
 	ipAddress := &ipamv1.IPAddress{}
 	if err := r.Client.Get(ctx, req.NamespacedName, ipAddress); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// If its deleting and has no finalizer, exit.
-	if !ipAddress.ObjectMeta.DeletionTimestamp.IsZero() {
-
-		// Verify that it has the finalizer, and that its the only one left before deleting IPs.
-		if controllerutil.ContainsFinalizer(ipAddress, infrav1.DeleteFloatingIPFinalizer) && len(ipAddress.GetFinalizers()) == 1 {
-
-		}
+	// Verify that the ipaddress is associated with openstackfloatingippool.
+	if ipAddress.Spec.PoolRef.Kind != openStackFloatingIPPool {
+		log.Info("IPAddress is not associated with OpenStackFloatingIPPool")
+		return ctrl.Result{}, nil
 	}
 
+	pool := &infrav1.OpenStackFloatingIPPool{}
+
+	if err := r.Client.Get(ctx, client.ObjectKey{
+		Namespace: ipAddress.Namespace,
+		Name:      ipAddress.Spec.PoolRef.Name,
+	}, pool); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	log = log.WithValues("openStackFloatingIPPool", pool.Name)
+
+	scope, err := r.ScopeFactory.NewClientScopeFromFloatingIPPool(ctx, r.Client, pool, r.CaCertificates, log)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	networkingService, err := networking.NewService(scope)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if !ipAddress.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.Info("IPAddress is being deleted")
+
+		if controllerutil.ContainsFinalizer(ipAddress, infrav1.DeleteFloatingIPFinalizer) && len(ipAddress.GetFinalizers()) == 1 {
+			if err = networkingService.DeleteFloatingIP(pool, ipAddress.Spec.Address); err != nil {
+				return ctrl.Result{}, fmt.Errorf("delete floating IP %q: %w", ipAddress.Spec.Address, err)
+			}
+			controllerutil.RemoveFinalizer(ipAddress, infrav1.DeleteFloatingIPFinalizer)
+			if err := r.Client.Update(ctx, ipAddress); err != nil {
+				return ctrl.Result{}, err
+			}
+			// remove ip from pool status
+			return ctrl.Result{}, nil
+		} else {
+			// TODO: less verbose logging
+			log.Info("IPAddress is being deleted but has other finalizers, waiting for them to be removed")
+		}
+	}
 	return ctrl.Result{}, nil
 }
 

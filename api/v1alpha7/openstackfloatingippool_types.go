@@ -53,13 +53,13 @@ type OpenStackFloatingIPPoolSpec struct {
 type OpenStackFloatingIPPoolStatus struct {
 	// +kubebuilder:default={}
 	// +optional
-	ClaimedIPs []string `json:"claimedIPs,omitempty"`
+	ClaimedIPs []string `json:"claimedIPs"`
 	// +kubebuilder:default={}
 	// +optional
-	AvailableIPs []string `json:"availableIPs,omitempty"`
+	AvailableIPs []string `json:"availableIPs"`
 	// +kubebuilder:default={}
 	// +optional
-	IPs []string `json:"ips,omitempty"`
+	IPs []string `json:"ips"`
 }
 
 //+kubebuilder:object:root=true
