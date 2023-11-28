@@ -165,7 +165,7 @@ func (r *OpenStackFloatingIPPoolReconciler) Reconcile(ctx context.Context, req c
 				},
 			}
 
-			if !contains(pool.Spec.PreAllocatedFloatingIPs, ip) {
+			if !contains(pool.Spec.PreAllocatedFloatingIPs, ip) && pool.Spec.ReclaimPolicy == infrav1.ReclaimDelete {
 				controllerutil.AddFinalizer(ipAddress, infrav1.DeleteFloatingIPFinalizer)
 			}
 
@@ -189,8 +189,11 @@ func (r *OpenStackFloatingIPPoolReconciler) Reconcile(ctx context.Context, req c
 }
 
 func (r *OpenStackFloatingIPPoolReconciler) reconcileDelete(ctx context.Context, pool *infrav1.OpenStackFloatingIPPool) (ctrl.Result, error) {
-	// If the OpenStackMachine doesn't have our finalizer, add it.
 	log := ctrl.LoggerFrom(ctx)
+	ipAddresses := &ipamv1.IPAddressList{}
+	if err := r.Client.List(ctx, ipAddresses, client.InNamespace(pool.Namespace), client.MatchingFields{infrav1.OpenStackFloatingIPPoolNameIndex: pool.Name}); err != nil {
+		return ctrl.Result{}, err
+	}
 	if controllerutil.RemoveFinalizer(pool, infrav1.OpenStackFloatingIPPoolFinalizer) {
 		// Delete all IPAdress ? :thinking: They've should have a finalizer from the OpenStackMachine
 		log.Info("Removing finalizer from OpenStackFloatingIPPool")
@@ -299,18 +302,14 @@ func (r *OpenStackFloatingIPPoolReconciler) getInfraCluster(ctx context.Context,
 	return openStackCluster, nil
 }
 
-// TODO: combine theese ///////////////////////////////////////////////////////////////////////////////////////////////
-
 func (r *OpenStackFloatingIPPoolReconciler) iPAddressClaimToPoolMapper(ctx context.Context, o client.Object) []ctrl.Request {
 	claim, ok := o.(*ipamv1.IPAddressClaim)
 	if !ok {
 		panic(fmt.Sprintf("Expected a IPAddressClaim but got a %T", o))
 	}
-
 	if claim.Spec.PoolRef.Kind != openStackFloatingIPPool {
 		return nil
 	}
-
 	return []ctrl.Request{
 		{
 			NamespacedName: client.ObjectKey{
@@ -326,11 +325,9 @@ func (r *OpenStackFloatingIPPoolReconciler) ipAddressToPoolMapper(ctx context.Co
 	if !ok {
 		panic(fmt.Sprintf("Expected a IPAddress but got a %T", o))
 	}
-
 	if ip.Spec.PoolRef.Kind != openStackFloatingIPPool {
 		return nil
 	}
-
 	return []ctrl.Request{
 		{
 			NamespacedName: client.ObjectKey{
@@ -341,13 +338,14 @@ func (r *OpenStackFloatingIPPoolReconciler) ipAddressToPoolMapper(ctx context.Co
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *OpenStackFloatingIPPoolReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// setup index for pool name
 	if err := mgr.GetFieldIndexer().IndexField(ctx, &ipamv1.IPAddressClaim{}, infrav1.OpenStackFloatingIPPoolNameIndex, func(rawObj client.Object) []string {
 		claim := rawObj.(*ipamv1.IPAddressClaim)
+		if claim.Spec.PoolRef.Kind != openStackFloatingIPPool {
+			return nil
+		}
 		return []string{claim.Spec.PoolRef.Name}
 	}); err != nil {
 		return err
@@ -367,7 +365,6 @@ func (r *OpenStackFloatingIPPoolReconciler) SetupWithManager(ctx context.Context
 			handler.EnqueueRequestsFromMapFunc(r.iPAddressClaimToPoolMapper),
 		).
 		WithOptions(controller.Options{
-			// To avoid race conditions when allocating IP Addresses, we explicitly set this to 1
 			MaxConcurrentReconciles: 1,
 		}).
 		Watches(

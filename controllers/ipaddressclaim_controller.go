@@ -153,19 +153,18 @@ func (r *IPAddressClaimReconciler) getOpenStackMachineForClaim(ctx context.Conte
 func (r *IPAddressClaimReconciler) openStackMachineToIPAddressClaim(ctx context.Context) handler.MapFunc {
 	return func(_ context.Context, o client.Object) []reconcile.Request {
 		openStackMachine, ok := o.(*infrav1.OpenStackMachine)
-		if !ok {
+		if !ok || openStackMachine.Spec.FloatingAddressFromPool == nil {
 			return nil
 		}
-		requests := make([]reconcile.Request, len(openStackMachine.Spec.FloatingAddressesFromPools))
-		for i, pool := range openStackMachine.Spec.FloatingAddressesFromPools {
-			requests[i] = reconcile.Request{
+
+		return []reconcile.Request{
+			{
 				NamespacedName: client.ObjectKey{
 					Namespace: openStackMachine.Namespace,
-					Name:      pool.Name,
+					Name:      openStackMachine.Spec.FloatingAddressFromPool.Name,
 				},
-			}
+			},
 		}
-		return requests
 	}
 }
 

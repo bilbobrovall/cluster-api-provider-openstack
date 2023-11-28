@@ -128,6 +128,26 @@ rules:
 - apiGroups:
   - ipam.cluster.x-k8x.io.cluster.x-k8s.io
   resources:
+  - ipaddressclaims
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ipam.cluster.x-k8x.io.cluster.x-k8s.io
+  resources:
+  - ipaddressclaims/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ipam.cluster.x-k8x.io.cluster.x-k8s.io
+  resources:
   - ipaddresses
   verbs:
   - create

@@ -283,7 +283,7 @@ func (r *OpenStackMachineReconciler) reconcileDelete(scope scope.Scope, cluster 
 		return ctrl.Result{}, fmt.Errorf("delete instance: %w", err)
 	}
 
-	if err := r.reconcileDeleteFloatingAddressesFromPool(scope, openStackMachine); err != nil {
+	if err := r.reconcileDeleteFloatingAddressFromPool(scope, openStackMachine); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -294,142 +294,119 @@ func (r *OpenStackMachineReconciler) reconcileDelete(scope scope.Scope, cluster 
 
 // reconcileFloatingIPClaims ensures that OpenStackMachines that are configured with .spec.floatingAddressesFromPools
 // have corresponding IPAddressClaims for each floating IP pool.
-func (r *OpenStackMachineReconciler) reconcileFloatingAddressesFromPool(ctx context.Context, scope scope.Scope, openStackMachine *infrav1.OpenStackMachine, openStackCluster *infrav1.OpenStackCluster, instanceStatus *compute.InstanceStatus, instanceNS *compute.InstanceNetworkStatus) error {
-	// TODO: should probably block infrastructure ready ???
-	log := ctrl.LoggerFrom(ctx)
+func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx context.Context, scope scope.Scope, openStackMachine *infrav1.OpenStackMachine, openStackCluster *infrav1.OpenStackCluster, instanceStatus *compute.InstanceStatus, instanceNS *compute.InstanceNetworkStatus) error {
 	var (
 		errList     []error
 		claimsReady = true
 	)
-	log.Info("Reconciling floating IP claims")
 
-	if openStackMachine.Spec.FloatingAddressesFromPools == nil || len(openStackMachine.Spec.FloatingAddressesFromPools) == 0 {
-		log.Info("No floating IP pools specified, skipping reconcile claim")
+	if openStackMachine.Spec.FloatingAddressFromPool == nil {
 		conditions.MarkTrue(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition)
 		return nil
 	}
 
 	networkingService, err := networking.NewService(scope)
 	if err != nil {
-		log.Error(err, "Failed to create networking service") // TODO Remove log
+		scope.Logger().Error(err, "Failed to create networking service") // TODO Remove log
 		return err
 	}
 
 	computeService, err := compute.NewService(scope)
 	if err != nil {
-		log.Error(err, "Failed to create compute service") // TODO Remove log
+		scope.Logger().Error(err, "Failed to create compute service") // TODO Remove log
 		return err
 	}
 
-	for _, pool := range openStackMachine.Spec.FloatingAddressesFromPools {
-		claimName := fmt.Sprintf("%s-fip-pool-%s", openStackMachine.Name, pool.Name)
-		claim := &ipamv1.IPAddressClaim{}
-		claimKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claimName}
+	poolRef := openStackMachine.Spec.FloatingAddressFromPool
 
-		if err := r.Client.Get(ctx, claimKey, claim); err != nil {
-			if apierrors.IsNotFound(err) {
-				claim = &ipamv1.IPAddressClaim{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      claimName,
-						Namespace: openStackMachine.Namespace,
-						Labels: map[string]string{
-							clusterv1.ClusterNameLabel: openStackCluster.Labels[clusterv1.ClusterNameLabel],
-						},
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								APIVersion: openStackMachine.APIVersion,
-								Kind:       openStackMachine.Kind,
-								Name:       openStackMachine.Name,
-								UID:        openStackMachine.UID,
-							},
+	claimName := fmt.Sprintf("%s-fip-pool-%s", openStackMachine.Name, poolRef.Name)
+	claim := &ipamv1.IPAddressClaim{}
+	claimKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claimName}
+
+	if err := r.Client.Get(ctx, claimKey, claim); err != nil {
+		if apierrors.IsNotFound(err) {
+			claim = &ipamv1.IPAddressClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      claimName,
+					Namespace: openStackMachine.Namespace,
+					Labels: map[string]string{
+						clusterv1.ClusterNameLabel: openStackCluster.Labels[clusterv1.ClusterNameLabel],
+					},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion: openStackMachine.APIVersion,
+							Kind:       openStackMachine.Kind,
+							Name:       openStackMachine.Name,
+							UID:        openStackMachine.UID,
 						},
 					},
-					Spec: ipamv1.IPAddressClaimSpec{
-						PoolRef: pool,
-					},
-				}
-
-				if err := r.Client.Create(ctx, claim); err != nil {
-					errList = append(errList, err)
-				}
-				continue
+				},
+				Spec: ipamv1.IPAddressClaimSpec{
+					PoolRef: *poolRef,
+				},
 			}
-			errList = append(errList, err)
-			continue
+
+			if err := r.Client.Create(ctx, claim); err != nil {
+				return err
+			}
 		}
-		// TODO: Watch the IPAddressClaim and enqueue reconcile requests for the OpenStackMachine if the IPAddressClaim changes.
-		// Requeue for now
-
-		if claim.Status.AddressRef.Name != "" {
-			// Todo: get the address from the claim and associate it with the instance
-			address := &ipamv1.IPAddress{}
-			addressKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claim.Status.AddressRef.Name}
-
-			if err := r.Client.Get(ctx, addressKey, address); err != nil {
-				if apierrors.IsNotFound(err) {
-					// TODO: something is wrong, the address should exist
-					continue
-				}
-				errList = append(errList, err)
-				continue
-			}
-
-			instanceAddresses := instanceNS.Addresses()
-			// TODO: make shit nicer
-			bajs := false
-			for _, instanceAddress := range instanceAddresses {
-				if instanceAddress.Address == address.Spec.Address {
-					bajs = true
-					log.Info("Address is already associated with machine") // TODO remove log
-					break
-				}
-			}
-			if bajs {
-				continue
-			}
-
-			//TODO: associate the address with the instance
-			fip, err := networkingService.GetFloatingIP(address.Spec.Address)
-			if err != nil {
-				// TODO: something is wrong, the address should exist
-				log.Error(err, "say what")
-				continue
-			}
-
-			if fip == nil {
-				log.Info("Ip does not exists lul") // TODO: remove log
-				continue
-			}
-
-			port, err := computeService.GetManagementPort(openStackCluster, instanceStatus)
-			if err != nil {
-				log.Error(err, "Failed to get management port for OpenStackMachine", "name", openStackMachine.Name) // TODO Remove log
-				errList = append(errList, err)
-				continue
-			}
-
-			if err = networkingService.AssociateFloatingIP(openStackMachine, fip, port.ID); err != nil {
-				errList = append(errList, err)
-				log.Error(err, "Failed to associate floating IP to port", "name", openStackMachine.Name) // TODO Remove log
-				continue
-			}
-
-			log.Info("Successfully associated floating IP to port yolo", "name", openStackMachine.Name) // TODO Remove log
-
-			//TODO: Make double sure the finalizer is added
-			if controllerutil.AddFinalizer(claim, infrav1.IPClaimMachineFinalizer) {
-				if err := r.Client.Update(ctx, claim); err != nil {
-					log.Error(err, "failed to add finalizer to IPAddressClaim", "name", claim.Name)
-					errList = append(errList, err)
-				}
-			}
-		} else {
-			claimsReady = false
-		}
+		errList = append(errList, err)
 	}
+	// TODO: Watch the IPAddressClaim and enqueue reconcile requests for the OpenStackMachine if the IPAddressClaim changes.
+	// Requeue for now
 
-	if !claimsReady {
-		errList = append(errList, fmt.Errorf("waiting for floating IP claims to be fullfilled by IPAM provider"))
+	if claim.Status.AddressRef.Name != "" {
+		// Todo: get the address from the claim and associate it with the instance
+		address := &ipamv1.IPAddress{}
+		addressKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claim.Status.AddressRef.Name}
+
+		if err := r.Client.Get(ctx, addressKey, address); err != nil {
+			return err
+		}
+
+		instanceAddresses := instanceNS.Addresses()
+		for _, instanceAddress := range instanceAddresses {
+			if instanceAddress.Address == address.Spec.Address {
+				scope.Logger().Info("Address is already associated with machine") // TODO remove log
+				// Great we win something something
+				break
+			}
+		}
+
+		//TODO: associate the address with the instance
+		fip, err := networkingService.GetFloatingIP(address.Spec.Address)
+		if err != nil {
+			// set condition
+			return err
+		}
+
+		if fip == nil {
+			// set condition
+			scope.Logger().Info("Ip does not exists lul") // TODO: remove log
+			return errors.New("floating IP does not exist, cannot associate")
+		}
+
+		port, err := computeService.GetManagementPort(openStackCluster, instanceStatus)
+		if err != nil {
+			scope.Logger().Error(err, "Failed to get management port for OpenStackMachine", "name", openStackMachine.Name) // TODO Remove log
+			return err
+		}
+
+		if err = networkingService.AssociateFloatingIP(openStackMachine, fip, port.ID); err != nil {
+			return err
+		}
+
+		scope.Logger().Info("Successfully associated floating IP to port yolo", "name", openStackMachine.Name) // TODO Remove log
+
+		//TODO: Make double sure the finalizer is added
+		if controllerutil.AddFinalizer(claim, infrav1.IPClaimMachineFinalizer) {
+			if err := r.Client.Update(ctx, claim); err != nil {
+				return err
+			}
+		}
+	} else {
+		// set something something requeue
+		scope.Logger().Info("yolo")
 	}
 
 	if len(errList) > 0 {
@@ -439,31 +416,29 @@ func (r *OpenStackMachineReconciler) reconcileFloatingAddressesFromPool(ctx cont
 	} else {
 		conditions.MarkTrue(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition)
 	}
-	log.Info("Reconciled floating IP claims successfully")
+	scope.Logger().Info("Reconciled floating IP claims successfully")
 	return kerrors.NewAggregate(errList)
 }
 
-func (r *OpenStackMachineReconciler) reconcileDeleteFloatingAddressesFromPool(scope scope.Scope, openStackMachine *infrav1.OpenStackMachine) error {
+func (r *OpenStackMachineReconciler) reconcileDeleteFloatingAddressFromPool(scope scope.Scope, openStackMachine *infrav1.OpenStackMachine) error {
 	scope.Logger().Info("Reconciling floating IP claims delete")
+	if openStackMachine.Spec.FloatingAddressFromPool == nil {
+		return nil
+	}
+	poolRef := openStackMachine.Spec.FloatingAddressFromPool
 
-	for _, pool := range openStackMachine.Spec.FloatingAddressesFromPools {
-		// TODO: claim name one place bruh
-		claimName := fmt.Sprintf("%s-fip-pool-%s", openStackMachine.Name, pool.Name)
-		claim := &ipamv1.IPAddressClaim{}
-		claimKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claimName}
+	// TODO: claim name one place bruh
+	claimName := fmt.Sprintf("%s-fip-pool-%s", openStackMachine.Name, poolRef.Name)
+	claim := &ipamv1.IPAddressClaim{}
+	claimKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claimName}
 
-		if err := r.Client.Get(context.Background(), claimKey, claim); err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			return err
-		}
+	if err := r.Client.Get(context.Background(), claimKey, claim); err != nil {
+		return client.IgnoreNotFound(err)
+	}
 
-		controllerutil.RemoveFinalizer(claim, infrav1.IPClaimMachineFinalizer)
-		if err := r.Client.Update(context.Background(), claim); err != nil {
-			scope.Logger().Error(err, "failed to remove finalizer from IPAddressClaim", "name", claim.Name)
-			return err
-		}
+	controllerutil.RemoveFinalizer(claim, infrav1.IPClaimMachineFinalizer)
+	if err := r.Client.Update(context.Background(), claim); err != nil {
+		return err
 	}
 	return nil
 }
@@ -541,7 +516,7 @@ func (r *OpenStackMachineReconciler) reconcileNormal(ctx context.Context, scope 
 	})
 	openStackMachine.Status.Addresses = addresses
 
-	if err := r.reconcileFloatingAddressesFromPool(ctx, scope, openStackMachine, openStackCluster, instanceStatus, instanceNS); err != nil {
+	if err := r.reconcileFloatingAddressFromPool(ctx, scope, openStackMachine, openStackCluster, instanceStatus, instanceNS); err != nil {
 		scope.Logger().Error(err, "Failed to reconcile floating IP claims")
 		return ctrl.Result{}, err
 	}
@@ -573,6 +548,7 @@ func (r *OpenStackMachineReconciler) reconcileNormal(ctx context.Context, scope 
 		// due to potential conflict or unexpected actions
 		scope.Logger().Info("Waiting for instance to become ACTIVE", "id", instanceStatus.ID(), "status", instanceStatus.State())
 		conditions.MarkUnknown(openStackMachine, infrav1.InstanceReadyCondition, infrav1.InstanceNotReadyReason, "Instance state is not handled: %s", instanceStatus.State())
+
 		return ctrl.Result{RequeueAfter: waitForInstanceBecomeActiveToReconcile}, nil
 	}
 

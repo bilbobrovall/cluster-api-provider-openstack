@@ -805,12 +805,10 @@ func (in *OpenStackMachineSpec) DeepCopyInto(out *OpenStackMachineSpec) {
 		*out = new(OpenStackIdentityReference)
 		**out = **in
 	}
-	if in.FloatingAddressesFromPools != nil {
-		in, out := &in.FloatingAddressesFromPools, &out.FloatingAddressesFromPools
-		*out = make([]v1.TypedLocalObjectReference, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+	if in.FloatingAddressFromPool != nil {
+		in, out := &in.FloatingAddressFromPool, &out.FloatingAddressFromPool
+		*out = new(v1.TypedLocalObjectReference)
+		(*in).DeepCopyInto(*out)
 	}
 }
 

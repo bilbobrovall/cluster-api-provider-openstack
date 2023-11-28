@@ -94,11 +94,11 @@ type OpenStackMachineSpec struct {
 	// +optional
 	IdentityRef *OpenStackIdentityReference `json:"identityRef,omitempty"`
 
-	// FloatingAddressesFromPools is a list of IPAddressPools that should be assigned
-	// to IPAddressClaims. The IPAddresses fulfilled by the IPAddressClaims will be
-	// associated with the OpenStackMachine instance.
+	// FloatingAddressFromPool is a reference to a IPPool that will be assigned
+	// to an IPAddressClaim. Once the IPAddressClaim is fulfilled, the FloatingIP
+	// will be assigned to the OpenStackMachine.
 	// +optional
-	FloatingAddressesFromPools []corev1.TypedLocalObjectReference `json:"floatingAddressesFromPools,omitempty"`
+	FloatingAddressFromPool *corev1.TypedLocalObjectReference `json:"floatingAddressFromPool,omitempty"`
 }
 
 // OpenStackMachineStatus defines the observed state of OpenStackMachine.

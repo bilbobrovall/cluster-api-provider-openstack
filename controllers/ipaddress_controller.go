@@ -68,7 +68,6 @@ func (r *IPAddressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Verify that the ipaddress is associated with openstackfloatingippool.
 	if ipAddress.Spec.PoolRef.Kind != openStackFloatingIPPool {
 		log.Info("IPAddress is not associated with OpenStackFloatingIPPool")
 		return ctrl.Result{}, nil
@@ -82,7 +81,6 @@ func (r *IPAddressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}, pool); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
 	log = log.WithValues("openStackFloatingIPPool", pool.Name)
 
 	scope, err := r.ScopeFactory.NewClientScopeFromFloatingIPPool(ctx, r.Client, pool, r.CaCertificates, log)
@@ -96,8 +94,7 @@ func (r *IPAddressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	if !ipAddress.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("IPAddress is being deleted")
-
+		// If the IPAddress has more than one finalizer, it has not been released by machine yet and we should not delete it.
 		if controllerutil.ContainsFinalizer(ipAddress, infrav1.DeleteFloatingIPFinalizer) && len(ipAddress.GetFinalizers()) == 1 {
 			if err = networkingService.DeleteFloatingIP(pool, ipAddress.Spec.Address); err != nil {
 				return ctrl.Result{}, fmt.Errorf("delete floating IP %q: %w", ipAddress.Spec.Address, err)

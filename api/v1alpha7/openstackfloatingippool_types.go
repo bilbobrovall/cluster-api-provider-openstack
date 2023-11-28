@@ -31,9 +31,16 @@ const (
 
 	// OpenStackFloatingIPPoolIP
 	DeleteFloatingIPFinalizer = "openstackfloatingippool.infrastructure.cluster.x-k8s.io/delete-floating-ip"
+)
 
-	// OpenStackFloatingIPPoolClaimFinalizer allows ReconcileOpenStackFloatingIPPool to clean up resources associated with OpenStackFloatingIPPoolClaim before
-	// removing it from the apiserver.
+// ReclaimPolicy is a string type alias to represent reclaim policies for floating ips
+type ReclaimPolicy string
+
+const (
+	// ReclaimDelete is the reclaim policy for floating ips
+	ReclaimDelete ReclaimPolicy = "Delete"
+	// ReclaimRetain is the reclaim policy for floating ips
+	ReclaimRetain ReclaimPolicy = "Retain"
 )
 
 // OpenStackFloatingIPPoolSpec defines the desired state of OpenStackFloatingIPPool
@@ -47,6 +54,12 @@ type OpenStackFloatingIPPoolSpec struct {
 	// The name of the cloud to use from the clouds secret
 	// +optional
 	CloudName string `json:"cloudName"`
+
+	// The stratergy to use for reclaiming floating ips when they are released from a machine
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=Retain;Delete
+	// +kubebuilder:default=Retain
+	ReclaimPolicy ReclaimPolicy `json:"reclaimPolicy,omitempty"`
 }
 
 // OpenStackFloatingIPPoolStatus defines the observed state of OpenStackFloatingIPPool
