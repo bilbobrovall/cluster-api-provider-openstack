@@ -1616,6 +1616,10 @@ spec:
                 description: MachineStatusError defines errors states for Machine
                   objects.
                 type: string
+              floatingAddressFromPoolReady:
+                description: FloatingAddressFromPoolReady is true when the FloatingIP
+                  is ready.
+                type: boolean
               instanceState:
                 description: InstanceState is the state of the OpenStack instance
                   for this machine.

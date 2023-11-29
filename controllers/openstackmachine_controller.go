@@ -55,6 +55,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-openstack/pkg/cloud/services/loadbalancer"
 	"sigs.k8s.io/cluster-api-provider-openstack/pkg/cloud/services/networking"
 	"sigs.k8s.io/cluster-api-provider-openstack/pkg/scope"
+	"sigs.k8s.io/cluster-api-provider-openstack/pkg/utils/names"
 )
 
 // OpenStackMachineReconciler reconciles a OpenStackMachine object.
@@ -218,6 +219,10 @@ func (r *OpenStackMachineReconciler) SetupWithManager(ctx context.Context, mgr c
 			handler.EnqueueRequestsFromMapFunc(r.requeueOpenStackMachinesForUnpausedCluster(ctx)),
 			builder.WithPredicates(predicates.ClusterUnpausedAndInfrastructureReady(ctrl.LoggerFrom(ctx))),
 		).
+		Watches(
+			&ipamv1.IPAddressClaim{},
+			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &infrav1.OpenStackMachine{}),
+		).
 		Complete(r)
 }
 
@@ -292,33 +297,29 @@ func (r *OpenStackMachineReconciler) reconcileDelete(scope scope.Scope, cluster 
 	return ctrl.Result{}, nil
 }
 
-// reconcileFloatingIPClaims ensures that OpenStackMachines that are configured with .spec.floatingAddressesFromPools
-// have corresponding IPAddressClaims for each floating IP pool.
+// reconcileFloatingAddressFromPool creates IPAddressClaims for the OpenStackMachine if the OpenStackMachine has a
+// FloatingAddressFromPool specified. It then associates the IPAddressClaim with the instance.
 func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx context.Context, scope scope.Scope, openStackMachine *infrav1.OpenStackMachine, openStackCluster *infrav1.OpenStackCluster, instanceStatus *compute.InstanceStatus, instanceNS *compute.InstanceNetworkStatus) error {
 	if openStackMachine.Spec.FloatingAddressFromPool == nil {
-		conditions.MarkTrue(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition)
+		conditions.MarkTrue(openStackMachine, infrav1.FloatingAddressFromPoolReadyCondition)
+		openStackMachine.Status.FloatingAddressFromPoolReady = true
 		return nil
 	}
 
 	networkingService, err := networking.NewService(scope)
 	if err != nil {
-		scope.Logger().Error(err, "Failed to create networking service") // TODO Remove log
 		return err
 	}
-
 	computeService, err := compute.NewService(scope)
 	if err != nil {
-		scope.Logger().Error(err, "Failed to create compute service") // TODO Remove log
 		return err
 	}
 
 	poolRef := openStackMachine.Spec.FloatingAddressFromPool
 
-	claimName := fmt.Sprintf("%s-fip-pool-%s", openStackMachine.Name, poolRef.Name)
+	claimName := names.GetFloatingAddressIPAddressClaimName(openStackMachine.Name)
 	claim := &ipamv1.IPAddressClaim{}
-	claimKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claimName}
-
-	if err := r.Client.Get(ctx, claimKey, claim); err != nil {
+	if err := r.Client.Get(ctx, client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claimName}, claim); err != nil {
 		if apierrors.IsNotFound(err) {
 			claim = &ipamv1.IPAddressClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -340,7 +341,6 @@ func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx contex
 					PoolRef: *poolRef,
 				},
 			}
-
 			if err := r.Client.Create(ctx, claim); err != nil {
 				return err
 			}
@@ -349,11 +349,8 @@ func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx contex
 			return err
 		}
 	}
-	// TODO: Watch the IPAddressClaim and enqueue reconcile requests for the OpenStackMachine if the IPAddressClaim changes.
-	// Requeue for now
 
 	if claim.Status.AddressRef.Name != "" {
-		// Todo: get the address from the claim and associate it with the instance
 		address := &ipamv1.IPAddress{}
 		addressKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claim.Status.AddressRef.Name}
 
@@ -364,25 +361,23 @@ func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx contex
 		instanceAddresses := instanceNS.Addresses()
 		for _, instanceAddress := range instanceAddresses {
 			if instanceAddress.Address == address.Spec.Address {
-				break
+				openStackMachine.Status.FloatingAddressFromPoolReady = true
+				conditions.MarkTrue(openStackMachine, infrav1.FloatingAddressFromPoolReadyCondition)
+				return nil
 			}
 		}
 
 		fip, err := networkingService.GetFloatingIP(address.Spec.Address)
 		if err != nil {
-			// set condition
 			return err
 		}
-
 		if fip == nil {
-			// set condition
-			scope.Logger().Info("Ip does not exists lul") // TODO: remove log
-			return errors.New("floating IP does not exist, cannot associate")
+			conditions.MarkFalse(openStackMachine, infrav1.FloatingAddressFromPoolReadyCondition, infrav1.FloatingAddressFromPoolErrorReason, clusterv1.ConditionSeverityError, "floating IP does not exist")
+			return errors.New("floating IP does not exist in ")
 		}
 
 		port, err := computeService.GetManagementPort(openStackCluster, instanceStatus)
 		if err != nil {
-			scope.Logger().Error(err, "Failed to get management port for OpenStackMachine", "name", openStackMachine.Name) // TODO Remove log
 			return err
 		}
 
@@ -390,19 +385,18 @@ func (r *OpenStackMachineReconciler) reconcileFloatingAddressFromPool(ctx contex
 			return err
 		}
 
-		scope.Logger().Info("Successfully associated floating IP to port yolo", "name", openStackMachine.Name) // TODO Remove log
-
 		if controllerutil.AddFinalizer(claim, infrav1.IPClaimMachineFinalizer) {
 			if err := r.Client.Update(ctx, claim); err != nil {
 				return err
 			}
 		}
+		openStackMachine.Status.FloatingAddressFromPoolReady = true
+		conditions.MarkTrue(openStackMachine, infrav1.FloatingAddressFromPoolReadyCondition)
 	} else {
-		// set condition
-		scope.Logger().Info("yolo")
+		scope.Logger().Info("Waiting for IPAddressClaim to be allocated", "name", claim.Name)
+		openStackMachine.Status.FloatingAddressFromPoolReady = false
+		conditions.MarkFalse(openStackMachine, infrav1.FloatingAddressFromPoolReadyCondition, infrav1.FloatingAddressFromPoolWaitingForIpamProviderReason, clusterv1.ConditionSeverityWarning, "")
 	}
-
-	conditions.MarkTrue(openStackMachine, infrav1.FloatingIPsFromPoolReadyCondition)
 	return nil
 }
 
@@ -411,14 +405,9 @@ func (r *OpenStackMachineReconciler) reconcileDeleteFloatingAddressFromPool(scop
 	if openStackMachine.Spec.FloatingAddressFromPool == nil {
 		return nil
 	}
-	poolRef := openStackMachine.Spec.FloatingAddressFromPool
-
-	// TODO: claim name one place bruh
-	claimName := fmt.Sprintf("%s-fip-pool-%s", openStackMachine.Name, poolRef.Name)
+	claimName := names.GetFloatingAddressIPAddressClaimName(openStackMachine.Name)
 	claim := &ipamv1.IPAddressClaim{}
-	claimKey := client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claimName}
-
-	if err := r.Client.Get(context.Background(), claimKey, claim); err != nil {
+	if err := r.Client.Get(context.Background(), client.ObjectKey{Namespace: openStackMachine.Namespace, Name: claimName}, claim); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 
@@ -500,16 +489,20 @@ func (r *OpenStackMachineReconciler) reconcileNormal(ctx context.Context, scope 
 	openStackMachine.Status.Addresses = addresses
 
 	if err := r.reconcileFloatingAddressFromPool(ctx, scope, openStackMachine, openStackCluster, instanceStatus, instanceNS); err != nil {
-		scope.Logger().Error(err, "Failed to reconcile floating IP claims")
+		conditions.MarkFalse(openStackMachine, infrav1.FloatingAddressFromPoolReadyCondition, infrav1.FloatingAddressFromPoolErrorReason, clusterv1.ConditionSeverityError, "Failed to reconcile floating IP claims: %v", err)
 		return ctrl.Result{}, err
 	}
 
 	switch instanceStatus.State() {
 	case infrav1.InstanceStateActive:
-		scope.Logger().Info("Machine instance state is ACTIVE", "id", instanceStatus.ID())
-		// TODO: should we be ready if the FloatingIPsFromPool is not ready? yolo
-		conditions.MarkTrue(openStackMachine, infrav1.InstanceReadyCondition)
-		openStackMachine.Status.Ready = true
+		if openStackMachine.Status.FloatingAddressFromPoolReady {
+			scope.Logger().Info("Machine instance state is ACTIVE", "id", instanceStatus.ID())
+			conditions.MarkTrue(openStackMachine, infrav1.InstanceReadyCondition)
+		} else {
+			scope.Logger().Info("Machine instance state is ACTIVE, but floating IP is not ready yet", "id", instanceStatus.ID())
+			conditions.MarkFalse(openStackMachine, infrav1.FloatingAddressFromPoolReadyCondition, infrav1.FloatingAddressFromPoolWaitingForIpamProviderReason, clusterv1.ConditionSeverityWarning, "")
+			conditions.MarkFalse(openStackMachine, infrav1.InstanceReadyCondition, infrav1.FloatingAddressFromPoolWaitingForIpamProviderReason, clusterv1.ConditionSeverityWarning, "")
+		}
 	case infrav1.InstanceStateError:
 		// If the machine has a NodeRef then it must have been working at some point,
 		// so the error could be something temporary.

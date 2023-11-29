@@ -107,6 +107,10 @@ type OpenStackMachineStatus struct {
 	// +optional
 	Ready bool `json:"ready"`
 
+	// FloatingAddressFromPoolReady is true when the FloatingIP is ready.
+	// +optional
+	FloatingAddressFromPoolReady bool `json:"floatingAddressFromPoolReady"`
+
 	// Addresses contains the OpenStack instance associated addresses.
 	Addresses []corev1.NodeAddress `json:"addresses,omitempty"`
 

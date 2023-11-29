@@ -439,6 +439,14 @@ func Convert_v1alpha7_OpenStackClusterSpec_To_v1alpha6_OpenStackClusterSpec(in *
 	return autoConvert_v1alpha7_OpenStackClusterSpec_To_v1alpha6_OpenStackClusterSpec(in, out, s)
 }
 
+func Convert_v1alpha6_OpenStackMachineStatus_To_v1alpha7_OpenStackMachineStatus(in *OpenStackMachineStatus, out *infrav1.OpenStackMachineStatus, s apiconversion.Scope) error {
+	return autoConvert_v1alpha6_OpenStackMachineStatus_To_v1alpha7_OpenStackMachineStatus(in, out, s)
+}
+
+func Convert_v1alpha7_OpenStackMachineStatus_To_v1alpha6_OpenStackMachineStatus(in *infrav1.OpenStackMachineStatus, out *OpenStackMachineStatus, s apiconversion.Scope) error {
+	return autoConvert_v1alpha7_OpenStackMachineStatus_To_v1alpha6_OpenStackMachineStatus(in, out, s)
+}
+
 func Convert_v1alpha6_PortOpts_To_v1alpha7_PortOpts(in *PortOpts, out *infrav1.PortOpts, s apiconversion.Scope) error {
 	err := autoConvert_v1alpha6_PortOpts_To_v1alpha7_PortOpts(in, out, s)
 	if err != nil {
